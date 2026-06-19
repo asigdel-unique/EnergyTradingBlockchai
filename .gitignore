@@ -30,3 +30,8 @@
 # Snapshot cheatcodes output
 /snapshots
 .DS_Store
+.claude
+.agents
+CLAUDE.md
+AGENTS.md
+deploy.log
