@@ -182,9 +182,12 @@ contract EnergyMarketplace {
 
         request.active = false;
 
-        payable(offer.seller).transfer(totalCost);
+        (bool sellerPaid, ) = payable(offer.seller).call{value: totalCost}("");
+        require(sellerPaid, "Payment to seller failed");
+
         if (refund > 0) {
-            payable(request.buyer).transfer(refund);
+            (bool buyerRefunded, ) = payable(request.buyer).call{value: refund}("");
+            require(buyerRefunded, "Refund to buyer failed");
         }
 
         emit TradeExecuted(tradeId, offer.seller, request.buyer, request.energyNeeded, offer.price, block.timestamp);
