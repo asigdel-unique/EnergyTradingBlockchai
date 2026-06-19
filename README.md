@@ -1,57 +1,57 @@
-# Sample Hardhat 3 Project (`mocha` and `ethers`)
+# EnergyTradingBlockchain
 
-This project showcases a Hardhat 3 project using `mocha` for tests and the `ethers` library for Ethereum interactions.
+A decentralized peer-to-peer energy trading marketplace built with Solidity and Hardhat, featuring automatic offer/request matching and a React frontend.
 
-To learn more about Hardhat 3, please visit the [Getting Started guide](https://hardhat.org/docs/getting-started#getting-started-with-hardhat-3). To share your feedback, join our [Hardhat 3](https://hardhat.org/hardhat3-telegram-group) Telegram group or [open an issue](https://github.com/NomicFoundation/hardhat/issues/new) in our GitHub issue tracker.
+## How it works
 
-## Project Overview
+- Users register with a display name and post **sell offers** (energy + price) or **buy requests** (energy needed + max price, escrowed in ETH).
+- `autoMatch()` scans all active buy requests and settles every trade it can find against a fitting offer — no manual ID entry needed.
+- Settled trades (seller, buyer, energy, price, timestamp) are recorded on-chain and viewable in the frontend's trade history.
 
-This example project includes:
+## Project layout
 
-- A simple Hardhat configuration file.
-- Foundry-compatible Solidity unit tests.
-- TypeScript integration tests using `mocha` and ethers.js
-- Examples demonstrating how to connect to different types of networks, including locally simulating OP mainnet.
+```
+contracts/        Solidity source files (*.sol) and unit tests (*.t.sol)
+test/              TypeScript integration tests
+ignition/          Hardhat Ignition deployment modules
+scripts/           Deployment scripts run with `hardhat run`
+frontend/          React + ethers.js UI
+hardhat.config.ts
+```
 
 ## Usage
 
-### Running Tests
-
-To run all the tests in the project, execute the following command:
+### Install dependencies
 
 ```shell
-npx hardhat test
+npm install
+cd frontend && npm install
 ```
 
-You can also selectively run the Solidity or `mocha` tests:
+### Run a local chain
+
+```shell
+npx hardhat node
+```
+
+### Deploy the marketplace contract
+
+```shell
+npx hardhat run scripts/deploy-marketplace.js
+```
+
+Copy the printed contract address into `CONTRACT_ADDRESS` in `frontend/src/App.jsx`.
+
+### Run the frontend
+
+```shell
+cd frontend && npm run dev
+```
+
+Open the printed local URL, connect MetaMask to the Hardhat network (chain ID `31337`, RPC `http://127.0.0.1:8545`), and start trading.
+
+### Run tests
 
 ```shell
 npx hardhat test solidity
-npx hardhat test mocha
-```
-
-### Make a deployment to Sepolia
-
-This project includes an example Ignition module to deploy the contract. You can deploy this module to a locally simulated chain or to Sepolia.
-
-To run the deployment to a local chain:
-
-```shell
-npx hardhat ignition deploy ignition/modules/Counter.ts
-```
-
-To run the deployment to Sepolia, you need an account with funds to send the transaction. The provided Hardhat configuration includes a Configuration Variable called `SEPOLIA_PRIVATE_KEY`, which you can use to set the private key of the account you want to use.
-
-You can set the `SEPOLIA_PRIVATE_KEY` variable using the `hardhat-keystore` plugin or by setting it as an environment variable.
-
-To set the `SEPOLIA_PRIVATE_KEY` config variable using `hardhat-keystore`:
-
-```shell
-npx hardhat keystore set SEPOLIA_PRIVATE_KEY
-```
-
-After setting the variable, you can run the deployment with the Sepolia network:
-
-```shell
-npx hardhat ignition deploy --network sepolia ignition/modules/Counter.ts
 ```
