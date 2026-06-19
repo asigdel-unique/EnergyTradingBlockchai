@@ -12,6 +12,7 @@ contract EnergyMarketplace {
     mapping(address => User) public users;
 
     event UserRegistered(address indexed wallet, string name);
+    event UserRenamed(address indexed wallet, string name);
 
     function registerUser(string memory name) external {
         require(!users[msg.sender].registered, "Already registered");
@@ -26,12 +27,22 @@ contract EnergyMarketplace {
         emit UserRegistered(msg.sender, name);
     }
 
+    function updateName(string memory name) external {
+        require(users[msg.sender].registered, "Not registered");
+        require(bytes(name).length > 0, "Name required");
+
+        users[msg.sender].name = name;
+
+        emit UserRenamed(msg.sender, name);
+    }
+
     struct SellOffer {
         uint id;
         address seller;
         uint energy;
         uint price;
         bool active;
+        string sellerName;
     }
 
     SellOffer[] public sellOffers;
@@ -50,7 +61,8 @@ contract EnergyMarketplace {
             seller: msg.sender,
             energy: energy,
             price: price,
-            active: true
+            active: true,
+            sellerName: users[msg.sender].name
         }));
 
         emit SellOfferCreated(id, msg.sender, energy, price);
@@ -63,6 +75,7 @@ contract EnergyMarketplace {
         uint energyNeeded;
         uint maxPrice;
         bool active;
+        string buyerName;
     }
 
     BuyRequest[] public buyRequests;
@@ -82,7 +95,8 @@ contract EnergyMarketplace {
             buyer: msg.sender,
             energyNeeded: energyNeeded,
             maxPrice: maxPrice,
-            active: true
+            active: true,
+            buyerName: users[msg.sender].name
         }));
 
         emit BuyRequestCreated(id, msg.sender, energyNeeded, maxPrice);
@@ -96,6 +110,8 @@ contract EnergyMarketplace {
         uint energy;
         uint price;
         uint timestamp;
+        string sellerName;
+        string buyerName;
     }
 
     Trade[] public trades;
@@ -154,7 +170,9 @@ contract EnergyMarketplace {
             buyer: request.buyer,
             energy: request.energyNeeded,
             price: offer.price,
-            timestamp: block.timestamp
+            timestamp: block.timestamp,
+            sellerName: offer.sellerName,
+            buyerName: request.buyerName
         }));
 
         offer.energy -= request.energyNeeded;
