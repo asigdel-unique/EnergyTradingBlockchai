@@ -1,7 +1,9 @@
 import hre from "hardhat";
 
 async function main() {
-  const { ethers } = await hre.network.connect("localhost");
+  const networkFlagIndex = process.argv.indexOf("--network");
+  const networkName = networkFlagIndex !== -1 ? process.argv[networkFlagIndex + 1] : "localhost";
+  const { ethers } = await hre.network.connect(networkName);
 
   console.log("Deploying EnergyMarketplace...");
 

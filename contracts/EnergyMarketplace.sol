@@ -125,14 +125,18 @@ contract EnergyMarketplace {
 
         require(offer.active, "Sell offer not active");
         require(request.active, "Buy request not active");
-        require(offer.energy >= request.energyNeeded, "Not enough energy in offer");
         require(offer.price <= request.maxPrice, "Offer price too high");
 
-        _executeTrade(offer, request);
+        uint energy = offer.energy < request.energyNeeded ? offer.energy : request.energyNeeded;
+        _executeTrade(offer, request, energy);
     }
 
-    // Walks active buy requests in posting order and matches each against the
-    // oldest active offer that fits, settling as many trades as possible in one call.
+    // For each active buy request (oldest first), checks whether enough
+    // affordable supply exists to cover it completely; if so, prefers a
+    // single active offer that alone covers the full amount (cheapest such
+    // offer), and only splits across multiple offers, cheapest first, when
+    // no single offer is big enough. Requests that can't be fully covered
+    // yet are left untouched rather than partially filled.
     function autoMatch() external returns (uint matchesExecuted) {
         for (uint i = 0; i < buyRequests.length; i++) {
             BuyRequest storage request = buyRequests[i];
@@ -140,26 +144,77 @@ contract EnergyMarketplace {
                 continue;
             }
 
-            for (uint j = 0; j < sellOffers.length; j++) {
-                SellOffer storage offer = sellOffers[j];
-                if (!offer.active) {
-                    continue;
+            if (_affordableSupply(request.maxPrice) < request.energyNeeded) {
+                continue;
+            }
+
+            uint fullCoverIndex = _cheapestFullyCoveringOffer(request.maxPrice, request.energyNeeded);
+            if (fullCoverIndex != type(uint).max) {
+                _executeTrade(sellOffers[fullCoverIndex], request, request.energyNeeded);
+                matchesExecuted++;
+                continue;
+            }
+
+            while (request.active) {
+                uint cheapestIndex = type(uint).max;
+                uint cheapestPrice = type(uint).max;
+
+                for (uint j = 0; j < sellOffers.length; j++) {
+                    SellOffer storage offer = sellOffers[j];
+                    if (!offer.active || offer.price > request.maxPrice) {
+                        continue;
+                    }
+                    if (offer.price < cheapestPrice) {
+                        cheapestPrice = offer.price;
+                        cheapestIndex = j;
+                    }
                 }
 
-                if (offer.energy >= request.energyNeeded && offer.price <= request.maxPrice) {
-                    _executeTrade(offer, request);
-                    matchesExecuted++;
+                if (cheapestIndex == type(uint).max) {
                     break;
                 }
+
+                SellOffer storage cheapestOffer = sellOffers[cheapestIndex];
+                uint energy = cheapestOffer.energy < request.energyNeeded
+                    ? cheapestOffer.energy
+                    : request.energyNeeded;
+
+                _executeTrade(cheapestOffer, request, energy);
+                matchesExecuted++;
             }
         }
 
         emit AutoMatchCompleted(matchesExecuted);
     }
 
-    function _executeTrade(SellOffer storage offer, BuyRequest storage request) private {
-        uint totalCost = request.energyNeeded * offer.price;
-        uint escrowed = request.energyNeeded * request.maxPrice;
+    function _cheapestFullyCoveringOffer(uint maxPrice, uint energyNeeded) private view returns (uint bestIndex) {
+        bestIndex = type(uint).max;
+        uint bestPrice = type(uint).max;
+
+        for (uint j = 0; j < sellOffers.length; j++) {
+            SellOffer storage offer = sellOffers[j];
+            if (!offer.active || offer.price > maxPrice || offer.energy < energyNeeded) {
+                continue;
+            }
+            if (offer.price < bestPrice) {
+                bestPrice = offer.price;
+                bestIndex = j;
+            }
+        }
+    }
+
+    function _affordableSupply(uint maxPrice) private view returns (uint total) {
+        for (uint j = 0; j < sellOffers.length; j++) {
+            SellOffer storage offer = sellOffers[j];
+            if (offer.active && offer.price <= maxPrice) {
+                total += offer.energy;
+            }
+        }
+    }
+
+    function _executeTrade(SellOffer storage offer, BuyRequest storage request, uint energy) private {
+        uint totalCost = energy * offer.price;
+        uint escrowed = energy * request.maxPrice;
         uint refund = escrowed - totalCost;
 
         uint tradeId = trades.length;
@@ -168,19 +223,22 @@ contract EnergyMarketplace {
             id: tradeId,
             seller: offer.seller,
             buyer: request.buyer,
-            energy: request.energyNeeded,
+            energy: energy,
             price: offer.price,
             timestamp: block.timestamp,
             sellerName: offer.sellerName,
             buyerName: request.buyerName
         }));
 
-        offer.energy -= request.energyNeeded;
+        offer.energy -= energy;
         if (offer.energy == 0) {
             offer.active = false;
         }
 
-        request.active = false;
+        request.energyNeeded -= energy;
+        if (request.energyNeeded == 0) {
+            request.active = false;
+        }
 
         (bool sellerPaid, ) = payable(offer.seller).call{value: totalCost}("");
         require(sellerPaid, "Payment to seller failed");
@@ -190,7 +248,7 @@ contract EnergyMarketplace {
             require(buyerRefunded, "Refund to buyer failed");
         }
 
-        emit TradeExecuted(tradeId, offer.seller, request.buyer, request.energyNeeded, offer.price, block.timestamp);
+        emit TradeExecuted(tradeId, offer.seller, request.buyer, energy, offer.price, block.timestamp);
     }
 
     function getActiveOffers() external view returns (SellOffer[] memory) {

@@ -3,7 +3,7 @@ import { ethers } from "ethers";
 import EnergyMarketplaceABI from "./EnergyMarketplaceABI.json";
 import "./App.css";
 
-const CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+const CONTRACT_ADDRESS = "0x68e6Dd24bc71f86c66aCC5DE08F0934043186723";
 
 function App() {
   const [account, setAccount] = useState(null);
@@ -12,6 +12,13 @@ function App() {
 
   const [registerName, setRegisterName] = useState("");
   const [nameMap, setNameMap] = useState({});
+  const [isRegistered, setIsRegistered] = useState(false);
+  const [checkingRegistration, setCheckingRegistration] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isRegisteringTx, setIsRegisteringTx] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [isUpdatingName, setIsUpdatingName] = useState(false);
 
   const [sellEnergy, setSellEnergy] = useState("");
   const [sellPrice, setSellPrice] = useState("");
@@ -22,6 +29,18 @@ function App() {
   const [activeOffers, setActiveOffers] = useState([]);
   const [activeRequests, setActiveRequests] = useState([]);
   const [trades, setTrades] = useState([]);
+  const [balance, setBalance] = useState(null);
+
+  async function refreshBalance(address) {
+    if (!window.ethereum || !address) return;
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const balanceWei = await provider.getBalance(address);
+      setBalance(ethers.formatEther(balanceWei));
+    } catch {
+      // balance display is best-effort; ignore failures
+    }
+  }
 
   function displayName(address) {
     return nameMap[address.toLowerCase()] || `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -29,7 +48,8 @@ function App() {
 
   async function resolveNames(addresses) {
     if (!contract) return;
-    const unique = [...new Set(addresses.map((a) => a.toLowerCase()))].filter((a) => !(a in nameMap));
+    const validAddresses = addresses.filter((a) => typeof a === "string");
+    const unique = [...new Set(validAddresses.map((a) => a.toLowerCase()))].filter((a) => !(a in nameMap));
     if (unique.length === 0) return;
 
     const entries = await Promise.all(
@@ -47,12 +67,32 @@ function App() {
     setNameMap((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
   }
 
+  async function checkRegistration(address, marketplace) {
+    setCheckingRegistration(true);
+    try {
+      const user = await marketplace.users(address);
+      if (user.registered) {
+        setNameMap((prev) => ({ ...prev, [address.toLowerCase()]: user.name }));
+        setIsRegistered(true);
+        setStatus(`Welcome back, ${user.name}!`);
+      } else {
+        setIsRegistered(false);
+        setStatus("Wallet connected. Register a profile name to continue.");
+      }
+    } catch (err) {
+      setStatus("Error: " + (err.reason || err.message));
+    } finally {
+      setCheckingRegistration(false);
+    }
+  }
+
   async function connectWallet() {
     if (!window.ethereum) {
       setStatus("MetaMask not found. Please install it.");
       return;
     }
 
+    setIsConnecting(true);
     try {
       await window.ethereum.request({
         method: "wallet_requestPermissions",
@@ -68,18 +108,23 @@ function App() {
 
       setAccount(address);
       setContract(marketplace);
-      setStatus("Wallet connected: " + address);
+      await refreshBalance(address);
+      await checkRegistration(address, marketplace);
     } catch (err) {
       setStatus("Error: " + (err.reason || err.message));
+    } finally {
+      setIsConnecting(false);
     }
   }
 
   function disconnectWallet() {
     setAccount(null);
     setContract(null);
+    setIsRegistered(false);
     setActiveOffers([]);
     setActiveRequests([]);
     setTrades([]);
+    setBalance(null);
     setStatus("Disconnected.");
   }
 
@@ -99,15 +144,37 @@ function App() {
 
   async function registerUser() {
     if (!contract || !registerName.trim()) return;
+    setIsRegisteringTx(true);
     try {
       setStatus("Registering...");
       const tx = await contract.registerUser(registerName.trim());
       await tx.wait();
       setNameMap((prev) => ({ ...prev, [account.toLowerCase()]: registerName.trim() }));
-      setStatus(`Registered as "${registerName.trim()}"!`);
+      setIsRegistered(true);
+      setStatus(`Welcome, ${registerName.trim()}!`);
       setRegisterName("");
     } catch (err) {
       setStatus("Error: " + (err.reason || err.message));
+    } finally {
+      setIsRegisteringTx(false);
+    }
+  }
+
+  async function updateName() {
+    if (!contract || !newName.trim()) return;
+    setIsUpdatingName(true);
+    try {
+      setStatus("Updating name...");
+      const tx = await contract.updateName(newName.trim());
+      await tx.wait();
+      setNameMap((prev) => ({ ...prev, [account.toLowerCase()]: newName.trim() }));
+      setStatus(`Name updated to "${newName.trim()}"!`);
+      setNewName("");
+      setEditingName(false);
+    } catch (err) {
+      setStatus("Error: " + (err.reason || err.message));
+    } finally {
+      setIsUpdatingName(false);
     }
   }
 
@@ -118,10 +185,9 @@ function App() {
       const priceWei = ethers.parseEther(sellPrice);
       const tx = await contract.postSellOffer(sellEnergy, priceWei);
       await tx.wait();
-      setStatus(`Sell offer posted: ${sellEnergy} kWh at ${sellPrice} ETH/kWh`);
       setSellEnergy("");
       setSellPrice("");
-      loadMarketplace();
+      await autoMatch();
     } catch (err) {
       setStatus("Error: " + (err.reason || err.message));
     }
@@ -138,10 +204,9 @@ function App() {
         value: escrowAmount,
       });
       await tx.wait();
-      setStatus(`Buy request posted: ${buyEnergy} kWh, max ${buyMaxPrice} ETH/kWh (escrowed ${ethers.formatEther(escrowAmount)} ETH)`);
       setBuyEnergy("");
       setBuyMaxPrice("");
-      loadMarketplace();
+      await autoMatch();
     } catch (err) {
       setStatus("Error: " + (err.reason || err.message));
     }
@@ -153,6 +218,7 @@ function App() {
       const offers = await contract.getActiveOffers();
       const requests = await contract.getActiveRequests();
       const allTrades = await contract.getAllTrades();
+      const tradeEvents = await contract.queryFilter(contract.filters.TradeExecuted());
 
       await resolveNames([
         ...offers.map((o) => o.seller),
@@ -160,9 +226,23 @@ function App() {
         ...allTrades.flatMap((t) => [t.seller, t.buyer]),
       ]);
 
+      const tradesWithTx = allTrades.map((t, i) => ({
+        id: t.id,
+        seller: t.seller,
+        buyer: t.buyer,
+        energy: t.energy,
+        price: t.price,
+        timestamp: t.timestamp,
+        sellerName: t.sellerName,
+        buyerName: t.buyerName,
+        txHash: tradeEvents[i] ? tradeEvents[i].transactionHash : null,
+        blockNumber: tradeEvents[i] ? tradeEvents[i].blockNumber : null,
+      }));
+
       setActiveOffers(offers);
       setActiveRequests(requests);
-      setTrades(allTrades);
+      setTrades(tradesWithTx);
+      await refreshBalance(account);
     } catch (err) {
       setStatus("Error loading marketplace: " + (err.reason || err.message));
     }
@@ -196,41 +276,97 @@ function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <h1>Energy Marketplace</h1>
+        <h1>AA Smart Energy Exchange</h1>
         {account ? (
           <div className="wallet-controls">
-            <div className="wallet-badge">{displayName(account)}</div>
+            <div className="wallet-badge">
+              <div className="wallet-name">👤 {displayName(account)}</div>
+              <div className="wallet-address">
+                {account.slice(0, 6)}...{account.slice(-4)}
+              </div>
+              {balance !== null && <div className="wallet-balance">{Number(balance).toFixed(4)} ETH</div>}
+            </div>
             <button className="btn btn-secondary" onClick={disconnectWallet}>
               Disconnect
             </button>
           </div>
         ) : (
-          <button className="btn btn-primary" onClick={connectWallet}>
-            Connect Wallet
+          <button className="btn btn-primary" onClick={connectWallet} disabled={isConnecting}>
+            {isConnecting && <span className="spinner" />}
+            {isConnecting ? "Connecting..." : "Connect Wallet"}
           </button>
         )}
       </header>
 
       <main className="container">
         {!account ? (
+          <div className="panel landing">
+            <h2>Welcome to Energy Exchange</h2>
+            <p className="muted">Connect your wallet to register a new profile or access your dashboard.</p>
+            <button className="btn btn-primary" onClick={connectWallet} disabled={isConnecting}>
+              {isConnecting && <span className="spinner" />}
+              {isConnecting ? "Connecting..." : "Connect Wallet"}
+            </button>
+          </div>
+        ) : checkingRegistration ? (
           <div className="panel empty-state">
-            <p>Connect your wallet to start trading energy.</p>
+            <p>Checking your registration status...</p>
+          </div>
+        ) : !isRegistered ? (
+          <div className="panel landing">
+            <h2>New User Registration</h2>
+            <p className="muted">Enter a display name to register your wallet and access the dashboard.</p>
+            <div className="form-row">
+              <input
+                type="text"
+                placeholder="Enter Profile Name"
+                value={registerName}
+                onChange={(e) => setRegisterName(e.target.value)}
+              />
+              <button className="btn btn-primary" onClick={registerUser} disabled={isRegisteringTx}>
+                {isRegisteringTx && <span className="spinner" />}
+                {isRegisteringTx ? "Registering..." : "Register"}
+              </button>
+            </div>
           </div>
         ) : (
           <>
             <section className="panel">
-              <h2>Your Profile</h2>
-              <div className="form-row">
-                <input
-                  type="text"
-                  placeholder="Display name, e.g. Solar House A"
-                  value={registerName}
-                  onChange={(e) => setRegisterName(e.target.value)}
-                />
-                <button className="btn btn-primary" onClick={registerUser}>
-                  Register as User
-                </button>
+              <div className="panel-header">
+                <h2>Profile</h2>
+                {!editingName && (
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      setEditingName(true);
+                      setNewName(displayName(account));
+                    }}
+                  >
+                    Edit Name
+                  </button>
+                )}
               </div>
+              {editingName ? (
+                <div className="form-row">
+                  <input
+                    type="text"
+                    placeholder="New display name"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                  />
+                  <button className="btn btn-primary" onClick={updateName} disabled={isUpdatingName}>
+                    {isUpdatingName && <span className="spinner" />}
+                    {isUpdatingName ? "Saving..." : "Save"}
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => setEditingName(false)}>
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <p className="muted">
+                  You&apos;re registered as <strong>{displayName(account)}</strong>.
+                </p>
+              )}
             </section>
 
             <div className="panel-grid">
@@ -292,7 +428,7 @@ function App() {
                 <div className="card-grid">
                   {activeOffers.map((o) => (
                     <div key={o.id.toString()} className="card card-offer">
-                      <div className="card-title">{displayName(o.seller)}</div>
+                      <div className="card-title">{o.sellerName || displayName(o.seller)}</div>
                       <p className="card-line">{o.energy.toString()} kWh</p>
                       <p className="card-line card-sub">{ethers.formatEther(o.price)} ETH/kWh</p>
                     </div>
@@ -307,23 +443,14 @@ function App() {
                 <div className="card-grid">
                   {activeRequests.map((r) => (
                     <div key={r.id.toString()} className="card card-request">
-                      <div className="card-title">{displayName(r.buyer)}</div>
+                      <div className="card-title">{r.buyerName || displayName(r.buyer)}</div>
                       <p className="card-line">{r.energyNeeded.toString()} kWh needed</p>
                       <p className="card-line card-sub">up to {ethers.formatEther(r.maxPrice)} ETH/kWh</p>
+                      <p className="card-line card-sub">escrowed: {ethers.formatEther(r.energyNeeded * r.maxPrice)} ETH</p>
                     </div>
                   ))}
                 </div>
               )}
-            </section>
-
-            <section className="panel">
-              <h2>Automatic Matching</h2>
-              <p className="muted">
-                The contract scans all active buy requests and settles every trade it can find — no manual ID entry needed.
-              </p>
-              <button className="btn btn-primary" onClick={autoMatch}>
-                Run Matching
-              </button>
             </section>
 
             <section className="panel">
@@ -335,12 +462,18 @@ function App() {
                   {trades.map((t) => (
                     <div key={t.id.toString()} className="card card-trade">
                       <div className="card-title">
-                        {displayName(t.seller)} → {displayName(t.buyer)}
+                        {t.sellerName || displayName(t.seller)} → {t.buyerName || displayName(t.buyer)}
                       </div>
                       <p className="card-line">
                         {t.energy.toString()} kWh @ {ethers.formatEther(t.price)} ETH/kWh
                       </p>
+                      <p className="card-line card-sub">paid: {ethers.formatEther(t.energy * t.price)} ETH</p>
                       <p className="card-line card-sub">{new Date(Number(t.timestamp) * 1000).toLocaleString()}</p>
+                      {t.txHash && (
+                        <p className="card-line card-sub">
+                          tx: {t.txHash.slice(0, 10)}...{t.txHash.slice(-6)} (block {t.blockNumber})
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>

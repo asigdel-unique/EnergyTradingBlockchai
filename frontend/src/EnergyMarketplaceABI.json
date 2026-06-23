@@ -137,6 +137,25 @@
     "type": "event"
   },
   {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "wallet",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "name",
+        "type": "string"
+      }
+    ],
+    "name": "UserRenamed",
+    "type": "event"
+  },
+  {
     "inputs": [],
     "name": "autoMatch",
     "outputs": [
@@ -183,6 +202,11 @@
         "internalType": "bool",
         "name": "active",
         "type": "bool"
+      },
+      {
+        "internalType": "string",
+        "name": "buyerName",
+        "type": "string"
       }
     ],
     "stateMutability": "view",
@@ -218,6 +242,11 @@
             "internalType": "bool",
             "name": "active",
             "type": "bool"
+          },
+          {
+            "internalType": "string",
+            "name": "sellerName",
+            "type": "string"
           }
         ],
         "internalType": "struct EnergyMarketplace.SellOffer[]",
@@ -258,6 +287,11 @@
             "internalType": "bool",
             "name": "active",
             "type": "bool"
+          },
+          {
+            "internalType": "string",
+            "name": "buyerName",
+            "type": "string"
           }
         ],
         "internalType": "struct EnergyMarketplace.BuyRequest[]",
@@ -303,6 +337,16 @@
             "internalType": "uint256",
             "name": "timestamp",
             "type": "uint256"
+          },
+          {
+            "internalType": "string",
+            "name": "sellerName",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "buyerName",
+            "type": "string"
           }
         ],
         "internalType": "struct EnergyMarketplace.Trade[]",
@@ -426,6 +470,11 @@
         "internalType": "bool",
         "name": "active",
         "type": "bool"
+      },
+      {
+        "internalType": "string",
+        "name": "sellerName",
+        "type": "string"
       }
     ],
     "stateMutability": "view",
@@ -470,9 +519,32 @@
         "internalType": "uint256",
         "name": "timestamp",
         "type": "uint256"
+      },
+      {
+        "internalType": "string",
+        "name": "sellerName",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "buyerName",
+        "type": "string"
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "name",
+        "type": "string"
+      }
+    ],
+    "name": "updateName",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
