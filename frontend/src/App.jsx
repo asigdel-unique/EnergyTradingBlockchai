@@ -3,7 +3,7 @@ import { ethers } from "ethers";
 import EnergyMarketplaceABI from "./EnergyMarketplaceABI.json";
 import "./App.css";
 
-const CONTRACT_ADDRESS = "0x68e6Dd24bc71f86c66aCC5DE08F0934043186723";
+const CONTRACT_ADDRESS = "0x89f4E4Aa681E96Adf88524BD01783cF591f4fc2C";
 
 function App() {
   const [account, setAccount] = useState(null);
@@ -30,6 +30,7 @@ function App() {
   const [activeRequests, setActiveRequests] = useState([]);
   const [trades, setTrades] = useState([]);
   const [balance, setBalance] = useState(null);
+  const [now, setNow] = useState(() => Date.now());
 
   async function refreshBalance(address) {
     if (!window.ethereum || !address) return;
@@ -137,10 +138,32 @@ function App() {
       loadMarketplace();
     };
     contract.on("TradeExecuted", handleTrade);
+
+    // Offers expire purely by elapsed time, so poll periodically to drop
+    // expired ones from the list even without a new transaction.
+    const refreshInterval = setInterval(loadMarketplace, 15000);
+
     return () => {
       contract.off("TradeExecuted", handleTrade);
+      clearInterval(refreshInterval);
     };
   }, [contract]);
+
+  useEffect(() => {
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(tick);
+  }, []);
+
+  const visibleOffers = activeOffers.filter((o) => Number(o.expiresAt) * 1000 > now);
+
+  function formatTimeLeft(expiresAt) {
+    const msLeft = Number(expiresAt) * 1000 - now;
+    if (msLeft <= 0) return "Expired";
+    const totalSeconds = Math.ceil(msLeft / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `Expires in ${minutes}:${seconds.toString().padStart(2, "0")}`;
+  }
 
   async function registerUser() {
     if (!contract || !registerName.trim()) return;
@@ -334,7 +357,7 @@ function App() {
             <div className="stats-grid">
               <div className="stat-card">
                 <div className="stat-label">Active Offers</div>
-                <div className="stat-value">{activeOffers.length}</div>
+                <div className="stat-value">{visibleOffers.length}</div>
               </div>
               <div className="stat-card">
                 <div className="stat-label">Active Requests</div>
@@ -448,17 +471,23 @@ function App() {
               </div>
 
               <h3>Active Sell Offers</h3>
-              {activeOffers.length === 0 ? (
+              {visibleOffers.length === 0 ? (
                 <p className="empty-row">No active offers.</p>
               ) : (
                 <div className="card-grid">
-                  {activeOffers.map((o) => (
-                    <div key={o.id.toString()} className="card card-offer">
-                      <div className="card-title">{o.sellerName || displayName(o.seller)}</div>
-                      <p className="card-line">{o.energy.toString()} kWh</p>
-                      <p className="card-line card-sub">{ethers.formatEther(o.price)} ETH/kWh</p>
-                    </div>
-                  ))}
+                  {visibleOffers.map((o) => {
+                    const msLeft = Number(o.expiresAt) * 1000 - now;
+                    return (
+                      <div key={o.id.toString()} className="card card-offer">
+                        <div className="card-title">{o.sellerName || displayName(o.seller)}</div>
+                        <p className="card-line">{o.energy.toString()} kWh</p>
+                        <p className="card-line card-sub">{ethers.formatEther(o.price)} ETH/kWh</p>
+                        <p className={`card-expiry ${msLeft < 30000 ? "card-expiry-soon" : ""}`}>
+                          {formatTimeLeft(o.expiresAt)}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 

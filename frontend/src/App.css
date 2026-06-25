@@ -191,6 +191,35 @@ input[type="number"]:focus {
   font-size: 14px;
 }
 
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.stat-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-bg);
+  padding: 1.1rem 1.25rem;
+  box-shadow: var(--shadow);
+}
+
+.stat-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 0.4rem;
+}
+
+.stat-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -236,6 +265,16 @@ input[type="number"]:focus {
 .card-sub {
   color: var(--text-muted);
   font-size: 13px;
+}
+
+.card-expiry {
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
+.card-expiry-soon {
+  color: var(--danger);
 }
 
 .status-banner {

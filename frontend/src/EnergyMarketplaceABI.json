@@ -69,6 +69,12 @@
         "internalType": "uint256",
         "name": "price",
         "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "expiresAt",
+        "type": "uint256"
       }
     ],
     "name": "SellOfferCreated",
@@ -154,6 +160,19 @@
     ],
     "name": "UserRenamed",
     "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "OFFER_EXPIRY_DURATION",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
   },
   {
     "inputs": [],
@@ -247,6 +266,11 @@
             "internalType": "string",
             "name": "sellerName",
             "type": "string"
+          },
+          {
+            "internalType": "uint256",
+            "name": "expiresAt",
+            "type": "uint256"
           }
         ],
         "internalType": "struct EnergyMarketplace.SellOffer[]",
@@ -475,6 +499,11 @@
         "internalType": "string",
         "name": "sellerName",
         "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "expiresAt",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
