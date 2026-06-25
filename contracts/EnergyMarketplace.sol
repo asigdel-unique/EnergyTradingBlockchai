@@ -36,6 +36,8 @@ contract EnergyMarketplace {
         emit UserRenamed(msg.sender, name);
     }
 
+    uint public constant OFFER_EXPIRY_DURATION = 3 minutes;
+
     struct SellOffer {
         uint id;
         address seller;
@@ -43,11 +45,12 @@ contract EnergyMarketplace {
         uint price;
         bool active;
         string sellerName;
+        uint expiresAt;
     }
 
     SellOffer[] public sellOffers;
 
-    event SellOfferCreated(uint id, address indexed seller, uint energy, uint price);
+    event SellOfferCreated(uint id, address indexed seller, uint energy, uint price, uint expiresAt);
 
     function postSellOffer(uint energy, uint price) external returns (uint) {
         require(users[msg.sender].registered, "User not registered");
@@ -55,6 +58,7 @@ contract EnergyMarketplace {
         require(price > 0, "Price must be > 0");
 
         uint id = sellOffers.length;
+        uint expiresAt = block.timestamp + OFFER_EXPIRY_DURATION;
 
         sellOffers.push(SellOffer({
             id: id,
@@ -62,11 +66,16 @@ contract EnergyMarketplace {
             energy: energy,
             price: price,
             active: true,
-            sellerName: users[msg.sender].name
+            sellerName: users[msg.sender].name,
+            expiresAt: expiresAt
         }));
 
-        emit SellOfferCreated(id, msg.sender, energy, price);
+        emit SellOfferCreated(id, msg.sender, energy, price, expiresAt);
         return id;
+    }
+
+    function _isOfferLive(SellOffer storage offer) private view returns (bool) {
+        return offer.active && block.timestamp < offer.expiresAt;
     }
 
     struct BuyRequest {
@@ -123,7 +132,7 @@ contract EnergyMarketplace {
         SellOffer storage offer = sellOffers[sellOfferId];
         BuyRequest storage request = buyRequests[buyRequestId];
 
-        require(offer.active, "Sell offer not active");
+        require(_isOfferLive(offer), "Sell offer not active or expired");
         require(request.active, "Buy request not active");
         require(offer.price <= request.maxPrice, "Offer price too high");
 
@@ -161,7 +170,7 @@ contract EnergyMarketplace {
 
                 for (uint j = 0; j < sellOffers.length; j++) {
                     SellOffer storage offer = sellOffers[j];
-                    if (!offer.active || offer.price > request.maxPrice) {
+                    if (!_isOfferLive(offer) || offer.price > request.maxPrice) {
                         continue;
                     }
                     if (offer.price < cheapestPrice) {
@@ -193,7 +202,7 @@ contract EnergyMarketplace {
 
         for (uint j = 0; j < sellOffers.length; j++) {
             SellOffer storage offer = sellOffers[j];
-            if (!offer.active || offer.price > maxPrice || offer.energy < energyNeeded) {
+            if (!_isOfferLive(offer) || offer.price > maxPrice || offer.energy < energyNeeded) {
                 continue;
             }
             if (offer.price < bestPrice) {
@@ -206,7 +215,7 @@ contract EnergyMarketplace {
     function _affordableSupply(uint maxPrice) private view returns (uint total) {
         for (uint j = 0; j < sellOffers.length; j++) {
             SellOffer storage offer = sellOffers[j];
-            if (offer.active && offer.price <= maxPrice) {
+            if (_isOfferLive(offer) && offer.price <= maxPrice) {
                 total += offer.energy;
             }
         }
@@ -254,7 +263,7 @@ contract EnergyMarketplace {
     function getActiveOffers() external view returns (SellOffer[] memory) {
         uint count = 0;
         for (uint i = 0; i < sellOffers.length; i++) {
-            if (sellOffers[i].active) {
+            if (_isOfferLive(sellOffers[i])) {
                 count++;
             }
         }
@@ -262,7 +271,7 @@ contract EnergyMarketplace {
         SellOffer[] memory active = new SellOffer[](count);
         uint index = 0;
         for (uint i = 0; i < sellOffers.length; i++) {
-            if (sellOffers[i].active) {
+            if (_isOfferLive(sellOffers[i])) {
                 active[index] = sellOffers[i];
                 index++;
             }
