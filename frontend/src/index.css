@@ -1,22 +1,18 @@
 :root {
-  --bg: #0b1120;
-  --bg-grad-a: #0b1120;
-  --bg-grad-b: #161033;
-  --panel-bg: rgba(255, 255, 255, 0.045);
-  --panel-bg-solid: #131c31;
-  --border: rgba(255, 255, 255, 0.09);
-  --text: #e7ecf3;
-  --text-muted: #93a1b8;
-  --primary: #2dd4a7;
-  --primary-hover: #22b890;
-  --accent-blue: #38bdf8;
-  --accent-purple: #a78bfa;
-  --danger: #f87171;
-  --danger-bg: rgba(248, 113, 113, 0.12);
-  --success: #4ade80;
-  --success-bg: rgba(74, 222, 128, 0.12);
-  --radius: 12px;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 12px 28px rgba(0, 0, 0, 0.4);
+  --bg: #f1f5f4;
+  --panel-bg: #ffffff;
+  --border: #e2e8e6;
+  --text: #1f2937;
+  --text-muted: #64748b;
+  --primary: #0f9d72;
+  --primary-hover: #0c7f5c;
+  --accent-blue: #2563eb;
+  --danger: #dc2626;
+  --danger-bg: #fef2f2;
+  --success: #15803d;
+  --success-bg: #f0fdf4;
+  --radius: 10px;
+  --shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 4px 10px rgba(15, 23, 42, 0.06);
 
   --sans: system-ui, "Segoe UI", Roboto, sans-serif;
 
@@ -52,7 +48,6 @@ h3 {
 
 h1 {
   font-size: 20px;
-  letter-spacing: 0.01em;
 }
 
 h2 {
@@ -62,7 +57,7 @@ h2 {
 h3 {
   font-size: 13px;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   color: var(--text-muted);
   margin-bottom: 0.75rem;
 }
@@ -74,8 +69,4 @@ p {
 input,
 button {
   font: inherit;
-}
-
-::selection {
-  background: rgba(56, 189, 248, 0.3);
 }
