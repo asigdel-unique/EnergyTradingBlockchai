@@ -35,3 +35,8 @@
 CLAUDE.md
 AGENTS.md
 deploy.log
+.claude
+check-key-length.sh
+cleanup.sh
+commit-changes.sh
+test-paste-length.sh
