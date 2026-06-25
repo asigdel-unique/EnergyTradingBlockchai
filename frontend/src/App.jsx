@@ -331,6 +331,32 @@ function App() {
           </div>
         ) : (
           <>
+            <div className="stats-grid">
+              <div className="stat-card">
+                <div className="stat-label">Active Offers</div>
+                <div className="stat-value">{activeOffers.length}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Active Requests</div>
+                <div className="stat-value">{activeRequests.length}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Total Energy Traded</div>
+                <div className="stat-value">
+                  {trades.reduce((sum, t) => sum + t.energy, 0n).toString()} kWh
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Total ETH Volume</div>
+                <div className="stat-value">
+                  {Number(
+                    ethers.formatEther(trades.reduce((sum, t) => sum + t.energy * t.price, 0n))
+                  ).toFixed(4)}{" "}
+                  ETH
+                </div>
+              </div>
+            </div>
+
             <section className="panel">
               <div className="panel-header">
                 <h2>Profile</h2>
