@@ -4,6 +4,19 @@ import EnergyMarketplaceABI from "./EnergyMarketplaceABI.json";
 import "./App.css";
 
 const CONTRACT_ADDRESS = "0x89f4E4Aa681E96Adf88524BD01783cF591f4fc2C";
+const LOG_CHUNK_SIZE = 9000;
+
+async function queryFilterPaginated(contract, filter) {
+  const provider = contract.runner?.provider ?? contract.provider;
+  const latest = await provider.getBlockNumber();
+  const events = [];
+  for (let from = 0; from <= latest; from += LOG_CHUNK_SIZE) {
+    const to = Math.min(from + LOG_CHUNK_SIZE - 1, latest);
+    const chunk = await contract.queryFilter(filter, from, to);
+    events.push(...chunk);
+  }
+  return events;
+}
 
 function App() {
   const [account, setAccount] = useState(null);
@@ -241,7 +254,7 @@ function App() {
       const offers = await contract.getActiveOffers();
       const requests = await contract.getActiveRequests();
       const allTrades = await contract.getAllTrades();
-      const tradeEvents = await contract.queryFilter(contract.filters.TradeExecuted());
+      const tradeEvents = await queryFilterPaginated(contract, contract.filters.TradeExecuted());
 
       await resolveNames([
         ...offers.map((o) => o.seller),
